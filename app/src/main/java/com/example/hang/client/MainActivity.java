@@ -51,21 +51,21 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         btn_Send = (Button) findViewById(R.id.btn_send);
         editText = (EditText) findViewById(R.id.et_message);
-        btn_Send.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String text = editText.getText().toString();
-                if (!text.equals("")) {
-                    try {
-                        out.writeUTF(text);
-                        out.flush();
-                        editText.setText(new String(""));
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        });
+//        btn_Send.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                String text = editText.getText().toString();
+//                if (!text.equals("")) {
+//                    try {
+//                        out.writeUTF(text);
+//                        out.flush();
+//                        editText.setText(new String(""));
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
+//            }
+//        });
 
         //create socket connection
         Runnable runnable = new Runnable() {
@@ -86,6 +86,26 @@ public class MainActivity extends AppCompatActivity {
         };
         Thread connectThread = new Thread(runnable);
         connectThread.start();
+        try {
+            connectThread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
+        Runnable readTask = new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        String message = in.readUTF();
+                        System.out.println("Get command from Server : " + message);
+                    } catch (IOException e) {
+                        System.out.println("Read failed");
+                        System.exit(-1);
+                    }
+                }
+            }
+        };
+        new Thread(readTask).start();
     }
 }
