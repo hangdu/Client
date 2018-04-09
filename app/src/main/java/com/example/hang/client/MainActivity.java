@@ -12,6 +12,9 @@ import android.widget.Button;
 import android.widget.EditText;
 
 import java.io.BufferedReader;
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -24,17 +27,13 @@ import java.util.concurrent.TimeUnit;
 
 public class MainActivity extends AppCompatActivity {
     Socket socket;
-    String SOCKET_HOST = "192.168.3.68";
-    PrintWriter out;
-    BufferedReader in;
+    String SOCKET_HOST = "192.168.3.50";
+    DataOutputStream out;
+    DataInputStream in;
 
     Button btn_Send;
     EditText editText;
-    Button btn_startCollect;
-//    Button btn_stop;
-
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private ScheduledFuture<?> RSSIStrengthHandler;
+//    Button btn_startCollect;
 
     Handler myHandler = new Handler(Looper.getMainLooper()) {
         @Override
@@ -52,8 +51,21 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         btn_Send = (Button) findViewById(R.id.btn_send);
         editText = (EditText) findViewById(R.id.et_message);
-        btn_startCollect = (Button) findViewById(R.id.btn_startCollect);
-//        btn_stop = (Button) findViewById(R.id.btn_stop);
+        btn_Send.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String text = editText.getText().toString();
+                if (!text.equals("")) {
+                    try {
+                        out.writeUTF(text);
+                        out.flush();
+                        editText.setText(new String(""));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
 
         //create socket connection
         Runnable runnable = new Runnable() {
@@ -61,8 +73,8 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 try {
                     socket = new Socket(SOCKET_HOST, 12345);
-                    out = new PrintWriter(socket.getOutputStream(), true);
-                    in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    out = new DataOutputStream(socket.getOutputStream());
+                    in = new DataInputStream(socket.getInputStream());
                 } catch (UnknownHostException e) {
                     System.out.println("Unknown host: " + SOCKET_HOST);
                     System.exit(1);
@@ -72,64 +84,8 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
-        new Thread(runnable).start();
+        Thread connectThread = new Thread(runnable);
+        connectThread.start();
 
-        final Runnable runnable1 = new Runnable() {
-            @Override
-            public void run() {
-                //receiver text from server
-                try {
-                    //this line should not be on main thread
-                    String line = in.readLine();
-                    Message msg = Message.obtain();
-                    msg.what = 0;
-                    msg.obj = line;
-                    myHandler.sendMessage(msg);
-                    System.out.println("Text received: " + line);
-                } catch (IOException e){
-                    System.out.println("Read failed");
-                    System.exit(1);
-                }
-            }
-        };
-
-        btn_Send.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String text = editText.getText().toString();
-                if (!text.equals("")) {
-                    out.println(text);
-                    editText.setText(new String(""));
-                    new Thread(runnable1).start();
-                }
-            }
-        });
-
-        btn_startCollect.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String str = btn_startCollect.getText().toString();
-                if (str.equals("Start to collect")) {
-                    final Runnable fetchRSSI = new Runnable() {
-                        @Override
-                        public void run() {
-                            System.out.println("beep");
-                        }
-                    };
-                    RSSIStrengthHandler = scheduler.scheduleAtFixedRate(fetchRSSI, 0, 1, TimeUnit.SECONDS);
-                    btn_startCollect.setText("Stop");
-                    btn_startCollect.setBackgroundColor(Color.GREEN);
-                } else {
-                    scheduler.schedule(new Runnable() {
-                        @Override
-                        public void run() {
-                            RSSIStrengthHandler.cancel(true);
-                        }
-                    }, 0, TimeUnit.SECONDS);
-                    btn_startCollect.setText("Start to collect");
-                    btn_startCollect.setBackgroundColor(Color.TRANSPARENT);
-                }
-            }
-        });
     }
 }
