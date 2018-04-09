@@ -1,7 +1,10 @@
 package com.example.hang.client;
 
+import android.content.Context;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -20,6 +23,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -34,6 +38,21 @@ public class MainActivity extends AppCompatActivity {
     Button btn_Send;
     EditText editText;
 //    Button btn_startCollect;
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private ScheduledFuture<?> RSSIStrengthHandler;
+    final Runnable fetchRSSI = new Runnable() {
+        @Override
+        public void run() {
+            int strength = getSignalStrength();
+            System.out.println("strength = " + strength);
+        }
+    };
+    final Runnable stopFetchRSSI = new Runnable() {
+        @Override
+        public void run() {
+            RSSIStrengthHandler.cancel(true);
+        }
+    };
 
     Handler myHandler = new Handler(Looper.getMainLooper()) {
         @Override
@@ -99,6 +118,11 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         String message = in.readUTF();
                         System.out.println("Get command from Server : " + message);
+                        if (message.equals("1")) {
+                            RSSIStrengthHandler = scheduler.scheduleAtFixedRate(fetchRSSI, 0, 1, TimeUnit.SECONDS);
+                        } else {
+                            scheduler.schedule(stopFetchRSSI, 0, TimeUnit.SECONDS);
+                        }
                     } catch (IOException e) {
                         System.out.println("Read failed");
                         System.exit(-1);
@@ -107,5 +131,25 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         new Thread(readTask).start();
+    }
+
+
+
+    private int getSignalStrength() {
+        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        wifiManager.startScan();
+        List<ScanResult> wifiList = wifiManager.getScanResults();
+        if (wifiList.size() == 0) {
+            return 100;
+        }
+
+        for (int i = 0; i < wifiList.size(); i++) {
+            ScanResult scanResult = wifiList.get(i);
+            String macAddress = scanResult.BSSID;
+            if (macAddress.equals("d0:ff:98:81:46:f8")) {
+                return scanResult.level;
+            }
+        }
+        return 101;
     }
 }
