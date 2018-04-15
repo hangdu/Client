@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import java.io.BufferedReader;
 import java.io.DataInput;
@@ -36,8 +37,7 @@ public class MainActivity extends AppCompatActivity {
     DataInputStream in;
 
     Button btn_Send;
-    EditText editText;
-//    Button btn_startCollect;
+    TextView tv_status;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private ScheduledFuture<?> RSSIStrengthHandler;
     final Runnable fetchRSSI = new Runnable() {
@@ -45,12 +45,17 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             int strength = getSignalStrength();
             System.out.println("strength = " + strength);
+            Message msg = Message.obtain();
+            msg.what = 0;
+            msg.obj = String.valueOf(strength);
+            myHandler.sendMessage(msg);
         }
     };
     final Runnable stopFetchRSSI = new Runnable() {
         @Override
         public void run() {
             RSSIStrengthHandler.cancel(true);
+            myHandler.sendEmptyMessage(1);
         }
     };
 
@@ -58,8 +63,12 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void handleMessage(Message inputMessage) {
             // Gets the image task from the incoming Message object.
-            editText.setText((String)inputMessage.obj);
-
+            if (inputMessage.what == 0) {
+                String str = inputMessage.obj.toString();
+                tv_status.setText("RSSI="+str);
+            } else {
+                tv_status.setText("");
+            }
         }
     };
 
@@ -69,22 +78,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         btn_Send = (Button) findViewById(R.id.btn_send);
-        editText = (EditText) findViewById(R.id.et_message);
-//        btn_Send.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                String text = editText.getText().toString();
-//                if (!text.equals("")) {
-//                    try {
-//                        out.writeUTF(text);
-//                        out.flush();
-//                        editText.setText(new String(""));
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            }
-//        });
+        tv_status = (TextView) findViewById(R.id.tv_status);
 
         //create socket connection
         Runnable runnable = new Runnable() {
