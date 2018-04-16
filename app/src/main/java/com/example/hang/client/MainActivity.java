@@ -1,8 +1,6 @@
 package com.example.hang.client;
 
 import android.content.Context;
-import android.graphics.Color;
-import android.graphics.PorterDuff;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
@@ -10,22 +8,17 @@ import android.os.Looper;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
 
-import java.io.BufferedReader;
-import java.io.DataInput;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.List;
+import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -36,15 +29,16 @@ public class MainActivity extends AppCompatActivity {
     DataOutputStream out;
     DataInputStream in;
 
-    Button btn_Send;
     TextView tv_status;
+    BlockingDeque<Integer> queue;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private ScheduledFuture<?> RSSIStrengthHandler;
     final Runnable fetchRSSI = new Runnable() {
         @Override
         public void run() {
             int strength = getSignalStrength();
-            System.out.println("strength = " + strength);
+            queue.add(strength);
+
             Message msg = Message.obtain();
             msg.what = 0;
             msg.obj = String.valueOf(strength);
@@ -77,8 +71,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        btn_Send = (Button) findViewById(R.id.btn_send);
         tv_status = (TextView) findViewById(R.id.tv_status);
+        queue = new LinkedBlockingDeque<>();
 
         //create socket connection
         Runnable runnable = new Runnable() {
@@ -125,6 +119,30 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         new Thread(readTask).start();
+
+
+        Runnable writeTask = new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    Integer RSSI = null;
+                    try {
+                        RSSI = queue.poll(300, TimeUnit.MILLISECONDS);
+                        if (RSSI != null) {
+                            System.out.println("writeTask: strength = " + RSSI);
+                            out.writeUTF("RSSI="+String.valueOf(RSSI));
+                            out.flush();
+                        }
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+            }
+        };
+        new Thread(writeTask).start();
     }
 
 
