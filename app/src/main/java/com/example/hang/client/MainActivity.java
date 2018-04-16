@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
                         RSSI = queue.poll(300, TimeUnit.MILLISECONDS);
                         if (RSSI != null) {
                             System.out.println("writeTask: strength = " + RSSI);
-                            out.writeUTF("RSSI="+String.valueOf(RSSI));
+                            out.writeUTF(String.valueOf(RSSI));
                             out.flush();
                         }
                     } catch (InterruptedException e) {
